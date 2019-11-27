@@ -32,6 +32,7 @@
 
 import argparse
 import logging
+import random
 from pathlib import Path
 
 import ffmpeg
@@ -80,6 +81,7 @@ def main():
         x for ext in args.extensions for x in args.videos_dir.rglob('*' + ext)
     ]
     logging.info(f'Processing {len(videos)} videos.')
+    random.shuffle(videos)
 
     # initialize the network
     params = TransNetParams()
@@ -88,14 +90,20 @@ def main():
     net = TransNet(params)
 
     for video_path in videos:
-        predictions = process(net, params, video_path)
-        scenes = scenes_from_predictions(predictions, threshold=args.thresh)
-
         output_dir = args.output_dir / (video_path.relative_to(
             args.videos_dir).with_suffix(''))
         output_dir.mkdir(exist_ok=True, parents=True)
-        np.save(output_dir / 'predictions.npy', predictions)
-        np.savetxt(output_dir / 'scenes.txt', scenes, fmt='%d')
+        output_predictions = output_dir / 'predictions.npy'
+        output_scenes = output_dir / 'scenes.txt'
+
+        if output_predictions.exists() and output_scenes.exists():
+            logging.info(f'{output_dir} already processed, skipping.')
+            continue
+        predictions = process(net, params, video_path)
+        scenes = scenes_from_predictions(predictions, threshold=args.thresh)
+
+        np.save(output_predictions, predictions)
+        np.savetxt(output_scenes, scenes, fmt='%d')
 
 
 if __name__ == "__main__":
